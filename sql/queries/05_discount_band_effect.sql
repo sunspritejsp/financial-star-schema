@@ -1,6 +1,3 @@
--- Question: how do discounts affect margin, and where are the losses?
--- Technique: ratios computed from summed measures (non-additive),
--- and conditional counts with CASE.
 SELECT
     b.band_name,
     count(*)                                                AS sales_lines,

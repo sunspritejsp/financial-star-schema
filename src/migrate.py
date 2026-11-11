@@ -1,8 +1,3 @@
-"""Clean the four spreadsheets and load them into oltp.db (3NF).
-
-Run from the project root:  python src/migrate.py
-"""
-
 import sqlite3
 from pathlib import Path
 
@@ -21,14 +16,10 @@ SEGMENT_FIXES = {
 }
 COUNTRY_FIXES = {"PortugaL": "Portugal"}
 
-
 def read_period(period: str, prefix: str) -> pd.DataFrame:
-    """Read one period's Sales and Manufacturing files as one table of sales."""
-    # keep_default_na=False keeps the discount band "None" as text, not NaN.
     sales = pd.read_excel(RAW / f"{prefix}_-_Sales.xlsx", keep_default_na=False)
     manuf = pd.read_excel(RAW / f"{prefix}_-_Manufacturing.xlsx", keep_default_na=False)
 
-    # There is no key, so the two files pair up by row position.
     shared = sales.columns.intersection(manuf.columns)
     assert sales[shared].equals(manuf[shared]), f"{period}: files don't pair up"
     sales["Manufacturing Price"] = manuf["Manufacturing Price"]
@@ -40,22 +31,17 @@ def read_period(period: str, prefix: str) -> pd.DataFrame:
     print(f"{period}: {len(sales)} rows, dropping {duplicates.sum()} exact duplicates")
     sales = sales[~duplicates]
 
-    # 1NF: the 2020-2021 files hold country and product in one column.
     if "Country,Product" in sales.columns:
         sales[["Country", "Product"]] = sales["Country,Product"].str.split(",", expand=True)
         sales = sales.drop(columns="Country,Product")
     return sales
 
-
 def lookup_table(values, id_col: str, name_col: str) -> pd.DataFrame:
-    """One row per distinct value, numbered from 1 in alphabetical order."""
     names = sorted(set(values))
     return pd.DataFrame({id_col: range(1, len(names) + 1), name_col: names})
 
-
 def ids(table: pd.DataFrame, id_col: str, name_col: str) -> dict:
     return dict(zip(table[name_col], table[id_col]))
-
 
 df = pd.concat([read_period("2020-2021", "Base_de_dados_2020_2021"),
                 read_period("2022-2023", "Base_de_dados_2022_2023")], ignore_index=True)
@@ -68,9 +54,7 @@ assert len(df) == 1358, f"expected 1,358 sales, got {len(df)}"
 assert (df["Gross Sales"] - df["Units Sold"] * df["Sale Price"]).abs().max() < 0.01
 assert (df["Sales"] - (df["Gross Sales"] - df["Discounts"])).abs().max() < 0.01
 assert (df["Profit"] - (df["Sales"] - df["COGS"])).abs().max() < 0.01
-# Manufacturing Price depends only on the product.
 assert df.groupby("Product")["Manufacturing Price"].nunique().max() == 1
-# Each sale price fixes one segment and one cost per unit (a price tier).
 assert df.groupby("Sale Price")[["Segment", "unit_cost"]].nunique().max().max() == 1
 
 segment = lookup_table(df["Segment"], "segment_id", "segment_name")
@@ -84,7 +68,7 @@ discount_band = pd.DataFrame({
     "discount_band_id": [1, 2, 3, 4],
     "band_name": ["None", "Low", "Medium", "High"],
     "sort_order": [0, 1, 2, 3],
-    "min_rate": [0.00, 0.01, 0.05, 0.10],      # Discounts / Gross Sales
+    "min_rate": [0.00, 0.01, 0.05, 0.10],
     "max_rate": [0.00, 0.04, 0.09, 0.15],
 })
 

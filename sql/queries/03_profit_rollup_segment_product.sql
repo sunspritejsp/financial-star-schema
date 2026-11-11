@@ -1,8 +1,3 @@
--- Question: how much profit does each segment make, by product and in total?
--- Technique: rollup built with UNION ALL, since SQLite has no ROLLUP:
--- a subtotal per segment and a grand total.
--- As with a real ROLLUP, NULL means "all": NULL product is a segment
--- subtotal, and NULL segment is the grand total.
 WITH rollup AS (
     SELECT segment_name, product_name, sum(sales) AS sales, sum(profit) AS profit
     FROM fact_sales

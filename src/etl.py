@@ -1,11 +1,3 @@
-"""Build the star schema in dw.db and load it from oltp.db.
-
-Run from the project root:  python src/etl.py
-
-The ETL itself is SQL, in sql/etl.sql. It empties the warehouse and reloads it
-inside one transaction, so running this script twice gives the same result.
-"""
-
 import sqlite3
 from pathlib import Path
 

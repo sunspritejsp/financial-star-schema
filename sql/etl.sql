@@ -1,13 +1,5 @@
--- ETL from the OLTP database to the data warehouse.
--- Runs on a connection to dw.db with oltp.db attached as "oltp".
---
--- Each run is a full refresh inside one transaction: it empties the
--- warehouse and reloads it, so running it twice gives the same result,
--- and a failure leaves the previous load untouched.
-
 BEGIN;
 
--- Empty the fact table first, because it references the dimensions.
 DELETE FROM fact_sales;
 DELETE FROM dim_date;
 DELETE FROM dim_segment;
@@ -15,7 +7,6 @@ DELETE FROM dim_country;
 DELETE FROM dim_product;
 DELETE FROM dim_discount_band;
 
--- Generate one row per month between the first and last sale.
 WITH RECURSIVE months (d) AS (
     SELECT min(sale_date) FROM oltp.sale
     UNION ALL
@@ -53,8 +44,6 @@ INSERT INTO dim_discount_band (band_name, sort_order, min_rate, max_rate)
 SELECT band_name, sort_order, min_rate, max_rate
 FROM oltp.discount_band ORDER BY sort_order;
 
--- Look up each dimension's surrogate key by its natural key (the name),
--- and compute the derived amounts once, at load time.
 INSERT INTO fact_sales (oltp_sale_id, date_key, segment_key, country_key, product_key,
                         discount_band_key, units_sold, sale_price, unit_cost,
                         gross_sales, discounts, sales, cogs, profit)

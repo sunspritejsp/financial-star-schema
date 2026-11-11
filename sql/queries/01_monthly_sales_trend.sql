@@ -1,5 +1,3 @@
--- Question: how do sales move from month to month?
--- Technique: LAG window function for the month-over-month change.
 WITH monthly AS (
     SELECT d.year_month, sum(f.sales) AS sales
     FROM fact_sales f

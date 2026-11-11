@@ -1,5 +1,3 @@
--- Question: how are each segment's sales spread across the years?
--- Technique: pivot with CASE inside SUM, one column per year.
 SELECT
     s.segment_name,
     round(sum(CASE WHEN d.year = 2020 THEN f.sales ELSE 0 END), 2) AS sales_2020,

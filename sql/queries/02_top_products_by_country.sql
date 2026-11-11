@@ -1,5 +1,3 @@
--- Question: which products bring the most profit in each country?
--- Technique: RANK window function, partitioned by country.
 WITH product_profit AS (
     SELECT c.country_name, p.product_name, sum(f.profit) AS profit
     FROM fact_sales f

@@ -1,6 +1,3 @@
--- Question: is 2022-2023 new business, or a copy of 2020-2021?
--- Technique: compare the two periods with GROUP BY, and recompute the
--- average price from sums, because a price is non-additive.
 SELECT
     d.data_period,
     count(*)                                    AS sales_lines,

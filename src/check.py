@@ -1,9 +1,3 @@
-"""Check that nothing was lost or changed between the three stages.
-
-Run from the project root:  python src/check.py
-Exits with an error if any check fails.
-"""
-
 import sqlite3
 import sys
 from pathlib import Path
@@ -14,16 +8,14 @@ ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "data" / "raw"
 OLTP_DB = ROOT / "oltp.db"
 DW_DB = ROOT / "dw.db"
-TOLERANCE = 0.01   # money is stored as REAL, so allow a cent of rounding
+TOLERANCE = 0.01
 
 failed = 0
-
 
 def check(name: str, ok: bool, detail: str = "") -> None:
     global failed
     print(f"[{'PASS' if ok else 'FAIL'}] {name}  {detail}")
     failed += not ok
-
 
 raw = []
 for prefix in ["Base_de_dados_2020_2021", "Base_de_dados_2022_2023"]:

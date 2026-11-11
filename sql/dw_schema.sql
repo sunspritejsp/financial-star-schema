@@ -1,18 +1,11 @@
--- Data warehouse star schema.
--- Grain of fact_sales: one row per sale line in the OLTP sale table.
--- Safe to run more than once: every object uses IF NOT EXISTS.
-
--- One row per month, from the first to the last month with sales.
--- The data is monthly (every date is the 1st), so a daily calendar
--- would only add empty rows.
 CREATE TABLE IF NOT EXISTS dim_date (
-    date_key     INTEGER PRIMARY KEY,            -- YYYYMMDD, such as 20210601
+    date_key     INTEGER PRIMARY KEY,
     full_date    TEXT    NOT NULL UNIQUE CHECK (date(full_date) = full_date),
     year         INTEGER NOT NULL,
     quarter      INTEGER NOT NULL CHECK (quarter BETWEEN 1 AND 4),
     month_number INTEGER NOT NULL CHECK (month_number BETWEEN 1 AND 12),
     month_name   TEXT    NOT NULL,
-    year_month   TEXT    NOT NULL UNIQUE,        -- YYYY-MM, for sorting and labels
+    year_month   TEXT    NOT NULL UNIQUE,
     data_period  TEXT    NOT NULL CHECK (data_period IN ('2020-2021', '2022-2023'))
 ) STRICT;
 
@@ -40,12 +33,9 @@ CREATE TABLE IF NOT EXISTS dim_discount_band (
     max_rate          REAL    NOT NULL
 ) STRICT;
 
--- Additive measures: units_sold, gross_sales, discounts, sales, cogs, profit.
--- Non-additive measures: sale_price and unit_cost. Average them weighted
--- by units, or recompute them from the sums, but never sum them.
 CREATE TABLE IF NOT EXISTS fact_sales (
     sale_key          INTEGER PRIMARY KEY,
-    oltp_sale_id      INTEGER NOT NULL UNIQUE,   -- degenerate dimension, for lineage
+    oltp_sale_id      INTEGER NOT NULL UNIQUE,
     date_key          INTEGER NOT NULL REFERENCES dim_date (date_key),
     segment_key       INTEGER NOT NULL REFERENCES dim_segment (segment_key),
     country_key       INTEGER NOT NULL REFERENCES dim_country (country_key),

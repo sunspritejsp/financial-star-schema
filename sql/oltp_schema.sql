@@ -1,7 +1,3 @@
--- OLTP schema in 3NF for the sales and manufacturing spreadsheets.
--- Safe to run more than once: every object uses IF NOT EXISTS.
--- Run PRAGMA foreign_keys = ON on the connection before inserting.
-
 CREATE TABLE IF NOT EXISTS segment (
     segment_id   INTEGER PRIMARY KEY,
     segment_name TEXT    NOT NULL UNIQUE CHECK (length(trim(segment_name)) > 0)
@@ -12,14 +8,12 @@ CREATE TABLE IF NOT EXISTS country (
     country_name TEXT    NOT NULL UNIQUE CHECK (length(trim(country_name)) > 0)
 ) STRICT;
 
--- Manufacturing Price depends only on the product, so it is stored here.
 CREATE TABLE IF NOT EXISTS product (
     product_id          INTEGER PRIMARY KEY,
     product_name        TEXT    NOT NULL UNIQUE CHECK (length(trim(product_name)) > 0),
     manufacturing_price REAL    NOT NULL CHECK (manufacturing_price > 0)
 ) STRICT;
 
--- A discount band is a range of discount rates (Discounts / Gross Sales).
 CREATE TABLE IF NOT EXISTS discount_band (
     discount_band_id INTEGER PRIMARY KEY,
     band_name        TEXT    NOT NULL UNIQUE,
@@ -29,9 +23,6 @@ CREATE TABLE IF NOT EXISTS discount_band (
     CHECK (min_rate <= max_rate)
 ) STRICT;
 
--- Each sale price belongs to exactly one tier, which fixes the segment
--- and the cost per unit. Keeping them here removes the transitive
--- dependency sale -> sale_price -> (segment, unit_cost).
 CREATE TABLE IF NOT EXISTS price_tier (
     price_tier_id INTEGER PRIMARY KEY,
     segment_id    INTEGER NOT NULL REFERENCES segment (segment_id),
@@ -39,10 +30,6 @@ CREATE TABLE IF NOT EXISTS price_tier (
     unit_cost     REAL    NOT NULL CHECK (unit_cost > 0)
 ) STRICT;
 
--- One row per sale line. A sales row and its manufacturing row describe
--- the same sale (they pair 1:1 by position), so they form one entity.
--- Gross Sales, Sales, COGS and Profit are derived, so they live in the
--- v_sale view below instead of being stored.
 CREATE TABLE IF NOT EXISTS sale (
     sale_id          INTEGER PRIMARY KEY,
     source_period    TEXT    NOT NULL CHECK (source_period IN ('2020-2021', '2022-2023')),
@@ -66,8 +53,6 @@ CREATE INDEX IF NOT EXISTS ix_sale_product ON sale (product_id);
 CREATE INDEX IF NOT EXISTS ix_sale_tier    ON sale (price_tier_id);
 CREATE INDEX IF NOT EXISTS ix_sale_band    ON sale (discount_band_id);
 
--- The sale with its descriptions and every derived amount, as in the
--- original spreadsheets.
 CREATE VIEW IF NOT EXISTS v_sale AS
 SELECT
     s.sale_id,
