@@ -1,0 +1,6 @@
+.vscode
+*.db
+__pycache__/
+.ipynb_checkpoints/
+CLAUDE.md
+docs/
