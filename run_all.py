@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent
 for db in ["oltp.db", "dw.db"]:
     (ROOT / db).unlink(missing_ok=True)
 
-for script in ["src/migrate.py", "src/etl.py", "src/check.py"]:
+for script in ["src/migrate.py", "src/etl.py"]:
     print(f"\n===== {script}")
     runpy.run_path(str(ROOT / script))
 

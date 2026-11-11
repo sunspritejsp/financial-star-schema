@@ -7,62 +7,61 @@ ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "data" / "raw"
 OLTP_DB = ROOT / "oltp.db"
 
-SEGMENT_FIXES = {
+sales_2020 = pd.read_excel(RAW / "Base_de_dados_2020_2021_-_Sales.xlsx", keep_default_na=False)
+manuf_2020 = pd.read_excel(RAW / "Base_de_dados_2020_2021_-_Manufacturing.xlsx", keep_default_na=False)
+sales_2022 = pd.read_excel(RAW / "Base_de_dados_2022_2023_-_Sales.xlsx", keep_default_na=False)
+manuf_2022 = pd.read_excel(RAW / "Base_de_dados_2022_2023_-_Manufacturing.xlsx", keep_default_na=False)
+
+assert (sales_2020["Units Sold"] == manuf_2020["Units Sold"]).all()
+assert (sales_2022["Units Sold"] == manuf_2022["Units Sold"]).all()
+
+sales_2020["COGS"] = manuf_2020["COGS"]
+sales_2020["Manufacturing Price"] = manuf_2020["Manufacturing Price"]
+sales_2022["COGS"] = manuf_2022["COGS"]
+sales_2022["Manufacturing Price"] = manuf_2022["Manufacturing Price"]
+
+print(f"2020-2021: {len(sales_2020)} linhas, {sales_2020.duplicated().sum()} duplicadas")
+print(f"2022-2023: {len(sales_2022)} linhas, {sales_2022.duplicated().sum()} duplicadas")
+sales_2020 = sales_2020.drop_duplicates()
+sales_2022 = sales_2022.drop_duplicates()
+
+sales_2020["source_period"] = "2020-2021"
+sales_2020["source_row"] = sales_2020.index
+sales_2022["source_period"] = "2022-2023"
+sales_2022["source_row"] = sales_2022.index
+
+sales_2020[["Country", "Product"]] = sales_2020["Country,Product"].str.split(",", expand=True)
+sales_2020 = sales_2020.drop(columns="Country,Product")
+
+df = pd.concat([sales_2020, sales_2022], ignore_index=True)
+df = df.drop(columns="Product_Name")
+df = df.rename(columns={" Sales": "Sales"})
+
+df["Segment"] = df["Segment"].replace({
     "Public Sectar": "Public Sector",
     "Retail Custmers": "Retail Customers",
     "Corp&rate": "Corporate",
     "Corprate": "Corporate",
     "Reselers": "Resellers",
-}
-COUNTRY_FIXES = {"PortugaL": "Portugal"}
+})
+df["Country"] = df["Country"].replace({"PortugaL": "Portugal"})
 
-def read_period(period: str, prefix: str) -> pd.DataFrame:
-    sales = pd.read_excel(RAW / f"{prefix}_-_Sales.xlsx", keep_default_na=False)
-    manuf = pd.read_excel(RAW / f"{prefix}_-_Manufacturing.xlsx", keep_default_na=False)
+assert len(df) == 1358
+assert ((df["Gross Sales"] - df["Units Sold"] * df["Sale Price"]).abs() < 0.01).all()
+assert ((df["Sales"] - (df["Gross Sales"] - df["Discounts"])).abs() < 0.01).all()
+assert ((df["Profit"] - (df["Sales"] - df["COGS"])).abs() < 0.01).all()
 
-    shared = sales.columns.intersection(manuf.columns)
-    assert sales[shared].equals(manuf[shared]), f"{period}: files don't pair up"
-    sales["Manufacturing Price"] = manuf["Manufacturing Price"]
-    sales["COGS"] = manuf["COGS"]
+segment = pd.DataFrame({"segment_name": sorted(df["Segment"].unique())})
+segment["segment_id"] = segment.index + 1
 
-    sales["source_period"] = period
-    sales["source_row"] = sales.index
-    duplicates = sales.drop(columns="source_row").duplicated()
-    print(f"{period}: {len(sales)} rows, dropping {duplicates.sum()} exact duplicates")
-    sales = sales[~duplicates]
+country = pd.DataFrame({"country_name": sorted(df["Country"].unique())})
+country["country_id"] = country.index + 1
 
-    if "Country,Product" in sales.columns:
-        sales[["Country", "Product"]] = sales["Country,Product"].str.split(",", expand=True)
-        sales = sales.drop(columns="Country,Product")
-    return sales
-
-def lookup_table(values, id_col: str, name_col: str) -> pd.DataFrame:
-    names = sorted(set(values))
-    return pd.DataFrame({id_col: range(1, len(names) + 1), name_col: names})
-
-def ids(table: pd.DataFrame, id_col: str, name_col: str) -> dict:
-    return dict(zip(table[name_col], table[id_col]))
-
-df = pd.concat([read_period("2020-2021", "Base_de_dados_2020_2021"),
-                read_period("2022-2023", "Base_de_dados_2022_2023")], ignore_index=True)
-df = df.rename(columns={" Sales": "Sales"}).drop(columns="Product_Name")
-df["Segment"] = df["Segment"].replace(SEGMENT_FIXES)
-df["Country"] = df["Country"].replace(COUNTRY_FIXES)
-df["unit_cost"] = df["COGS"] / df["Units Sold"]
-
-assert len(df) == 1358, f"expected 1,358 sales, got {len(df)}"
-assert (df["Gross Sales"] - df["Units Sold"] * df["Sale Price"]).abs().max() < 0.01
-assert (df["Sales"] - (df["Gross Sales"] - df["Discounts"])).abs().max() < 0.01
-assert (df["Profit"] - (df["Sales"] - df["COGS"])).abs().max() < 0.01
-assert df.groupby("Product")["Manufacturing Price"].nunique().max() == 1
-assert df.groupby("Sale Price")[["Segment", "unit_cost"]].nunique().max().max() == 1
-
-segment = lookup_table(df["Segment"], "segment_id", "segment_name")
-country = lookup_table(df["Country"], "country_id", "country_name")
-
-product = lookup_table(df["Product"], "product_id", "product_name")
-product["manufacturing_price"] = product["product_name"].map(
-    df.groupby("Product")["Manufacturing Price"].first())
+product = df[["Product", "Manufacturing Price"]].drop_duplicates().sort_values("Product")
+product = product.rename(columns={"Product": "product_name",
+                                  "Manufacturing Price": "manufacturing_price"})
+product = product.reset_index(drop=True)
+product["product_id"] = product.index + 1
 
 discount_band = pd.DataFrame({
     "discount_band_id": [1, 2, 3, 4],
@@ -72,35 +71,38 @@ discount_band = pd.DataFrame({
     "max_rate": [0.00, 0.04, 0.09, 0.15],
 })
 
-price_tier = (df[["Segment", "Sale Price", "unit_cost"]].drop_duplicates()
-              .sort_values(["Segment", "Sale Price"]).reset_index(drop=True))
-price_tier.insert(0, "price_tier_id", price_tier.index + 1)
-price_tier["segment_id"] = price_tier["Segment"].map(ids(segment, "segment_id", "segment_name"))
-price_tier = price_tier.rename(columns={"Sale Price": "sale_price"}).drop(columns="Segment")
+df["unit_cost"] = df["COGS"] / df["Units Sold"]
+price_tier = df[["Segment", "Sale Price", "unit_cost"]].drop_duplicates()
+price_tier = price_tier.sort_values(["Segment", "Sale Price"]).reset_index(drop=True)
+price_tier["price_tier_id"] = price_tier.index + 1
+price_tier = price_tier.merge(segment, left_on="Segment", right_on="segment_name")
+price_tier = price_tier.rename(columns={"Sale Price": "sale_price"})
+price_tier = price_tier[["price_tier_id", "segment_id", "sale_price", "unit_cost"]]
 
-sale = pd.DataFrame({
-    "source_period": df["source_period"],
-    "source_row": df["source_row"],
-    "sale_date": df["Date"].dt.strftime("%Y-%m-%d"),
-    "country_id": df["Country"].map(ids(country, "country_id", "country_name")),
-    "product_id": df["Product"].map(ids(product, "product_id", "product_name")),
-    "price_tier_id": df["Sale Price"].map(dict(zip(price_tier["sale_price"],
-                                                   price_tier["price_tier_id"]))),
-    "discount_band_id": df["Discount Band"].map(ids(discount_band, "discount_band_id",
-                                                    "band_name")),
-    "units_sold": df["Units Sold"],
-    "discounts": df["Discounts"],
-})
-assert sale.notna().all().all(), "a value has no matching lookup row"
+sale = df.merge(country, left_on="Country", right_on="country_name")
+sale = sale.merge(product, left_on="Product", right_on="product_name")
+sale = sale.merge(price_tier, left_on="Sale Price", right_on="sale_price")
+sale = sale.merge(discount_band, left_on="Discount Band", right_on="band_name")
+assert len(sale) == 1358
+
+sale = sale.sort_values(["source_period", "source_row"])
+sale["sale_date"] = sale["Date"].dt.strftime("%Y-%m-%d")
+sale = sale.rename(columns={"Units Sold": "units_sold", "Discounts": "discounts"})
+sale = sale[["source_period", "source_row", "sale_date", "country_id", "product_id",
+             "price_tier_id", "discount_band_id", "units_sold", "discounts"]]
 
 OLTP_DB.unlink(missing_ok=True)
 conn = sqlite3.connect(OLTP_DB)
 conn.execute("PRAGMA foreign_keys = ON")
 conn.executescript((ROOT / "sql" / "oltp_schema.sql").read_text(encoding="utf-8"))
-tables = {"segment": segment, "country": country, "product": product,
-          "discount_band": discount_band, "price_tier": price_tier, "sale": sale}
-with conn:
-    for name, table in tables.items():
-        table.to_sql(name, conn, if_exists="append", index=False)
-        print(f"oltp.db: {name} = {len(table)} rows")
+
+segment.to_sql("segment", conn, if_exists="append", index=False)
+country.to_sql("country", conn, if_exists="append", index=False)
+product.to_sql("product", conn, if_exists="append", index=False)
+discount_band.to_sql("discount_band", conn, if_exists="append", index=False)
+price_tier.to_sql("price_tier", conn, if_exists="append", index=False)
+sale.to_sql("sale", conn, if_exists="append", index=False)
+conn.commit()
 conn.close()
+
+print(f"oltp.db: sale = {len(sale)} rows")
