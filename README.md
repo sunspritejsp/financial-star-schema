@@ -1,6 +1,6 @@
 # Financial Star Schema
 
-A data warehousing project that loads messy spreadsheet data into a normalized relational database (OLTP), then into a star schema (OLAP) for analytical queries. Built with Python, Pandas and SQLite.
+A data warehousing project that loads messy spreadsheet data into a normalized relational database (OLTP), then into a star schema (OLAP) for analytical queries. Built with Python, Pandas, SQLite and Matplotlib.
 
 > **About the data:** the files in `data/raw/` are anonymized and altered sample data, so results from this project don't reflect any real business. The 2022-2023 files are also a copy of the 2020-2021 files with different years (see [data quality](docs/data_quality.md)), so no result should be read as growth or a trend.
 
@@ -22,6 +22,7 @@ python run_all.py
 | `python src/migrate.py` | Cleans the four spreadsheets with Pandas and loads them into `oltp.db` |
 | `python src/etl.py` | Builds the star schema in `dw.db` and loads it from `oltp.db` |
 | `python src/check.py` | Reconciles row counts and totals, and tests the constraints |
+| `python src/charts.py` | Plots profit by segment and margin by discount band, saves them to `charts/` and opens them in a window |
 
 ## How it works
 
@@ -40,7 +41,7 @@ flowchart LR
 3. **Data warehouse:** a star schema with one fact table (`fact_sales`, one row per sale line, 1,358 rows) and five dimensions: date, segment, country, product and discount band. See [`docs/dw_model.md`](docs/dw_model.md).
 4. **ETL:** [`sql/etl.sql`](sql/etl.sql) runs over `ATTACH DATABASE`, loading the dimensions first and then the fact table. It is a full refresh in one transaction, so a re-run gives the same result.
 5. **Reconciliation:** [`src/check.py`](src/check.py) confirms that the spreadsheets, `oltp.db` and `dw.db` have the same 1,358 sales and the same totals for units, sales, COGS and profit. It also checks that there are no broken foreign keys and that bad inserts are rejected.
-6. **Analytical queries:** six questions answered with `LAG`, `RANK`, a `UNION ALL` rollup and a `CASE` pivot. Each query is a file in [`sql/queries/`](sql/queries/), and `run_all.py` prints their results.
+6. **Analytical queries:** six business questions answered with joins, `GROUP BY`, `WHERE` and one `RANK`. Each query is a file in [`sql/queries/`](sql/queries/), and `run_all.py` prints their results. [`src/charts.py`](src/charts.py) plots two of them with Matplotlib.
 
 ## Main results
 
@@ -54,7 +55,7 @@ flowchart LR
 | Path | Contents |
 |---|---|
 | `data/raw/` | The four source spreadsheets |
-| `src/` | Python code: `migrate.py`, `etl.py` and `check.py` |
+| `src/` | Python code: `migrate.py`, `etl.py`, `check.py` and `charts.py` |
 | `sql/` | Schemas (`oltp_schema.sql`, `dw_schema.sql`), the ETL (`etl.sql`) and `queries/` |
 | `docs/` | Data-quality notes and model descriptions with diagrams |
 | `notebooks/` | Data exploration |

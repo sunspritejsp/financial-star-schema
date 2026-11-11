@@ -1,6 +1,5 @@
+import runpy
 import sqlite3
-import subprocess
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -11,8 +10,8 @@ for db in ["oltp.db", "dw.db"]:
     (ROOT / db).unlink(missing_ok=True)
 
 for script in ["src/migrate.py", "src/etl.py", "src/check.py"]:
-    print(f"\n===== {script}", flush=True)
-    subprocess.run([sys.executable, ROOT / script], check=True)
+    print(f"\n===== {script}")
+    runpy.run_path(str(ROOT / script))
 
 pd.set_option("display.float_format", "{:,.2f}".format)
 pd.set_option("display.width", 200)
